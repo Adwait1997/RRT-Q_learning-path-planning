@@ -9,13 +9,9 @@ from math import *
 import numpy as np
 
 
-# In[3]:
-
-
-#pygame 
-
 XDIM = 1000 #window length 
 YDIM = 1200 #window breadth
+
 WINSIZE = [XDIM, YDIM]
 EPSILON = 7.0 #threshold 
 NUMNODES = 10000
@@ -180,9 +176,6 @@ class __Q_table:
         
     def random_action(Current_Point) :
 
-        """
-        all the values assumed here are chosen randomly and can be changed according to the obstacles in the space.
-        """
         x=Current_Point[0]//5
         y=Current_Point[1]//5
         if((y<=0)and(x<=0)):
@@ -238,30 +231,28 @@ class __Q_table:
 
 
     def judge_goalfound(Current_Point,Goal_point):
-        """
-        this function validates the goal point.
-        """
+
         if(dist(Current_Point,Goal_point)<=6):
             return True
         return False
+
     
     
 class Node:
     
     def __init__(self):
-        
         self.x = x
         self.y = y
         self.cost = 0.0
         self.parent = None
-        self.children = set()
+        self.children = set()    
         
         
-class RRT_FND(__Q_table):
+class RRT(__Q_table):
     
-    def __init__(self, start, goal, obstacleList, 
-                 randArea, incremental_dist = 15.0, 
-                 learning_rate=10, max_iterations = 2000):
+    def __init__(self, start, goal, 
+                 obstacleList,  incremental_dist = 15.0, 
+                 learning_rate=20, max_iterations = 2000, randArea= None):
         
         self.start = Node(start[0], start[1])
         self.end   = Node(goal[0], goal[1])
@@ -275,7 +266,11 @@ class RRT_FND(__Q_table):
         
     def planning(self, animation = True):
         
-        self.NodeList = {}
+        self.NodeList = {0 : self.start}
+        i=0
+        
+        while True:
+            print(i)
         if set(self.start).intersection(obstacleList) == None:
             self.NodeList.append(self.start)
             
@@ -409,24 +404,24 @@ class RRT_FND(__Q_table):
     def get_best_last_index(self):
 
         disglist = [(key, self.calc_dist_to_goal(node.x, node.y)) for key, node in self.NodeList.items()]
-        goalinds = [key for key, distance in disglist if distance <= self.margin]
+        goal_indices = [key for key, distance in disglist if distance <= self.margin]
 
-        if len(goalinds) == 0:
+        if len(goal_indices) == 0:
             return None
 
-        minimum_cost = min([self.NodeList[key].cost for key in goalinds])
-        for i in goalinds:
+        minimum_cost = min([self.NodeList[key].cost for key in goal_indices])
+        for i in goal_indices:
             if self.NodeList[i].cost == minimum_cost:
                 return i
 
         return None
 
-    def gen_final_course(self, goalind):
+    def gen_final_course(self, goal_indices):
         path = [[self.end.x, self.end.y]]
-        while self.NodeList[goalind].parent is not None:
-            node = self.NodeList[goalind]
+        while self.NodeList[goal_indices].parent is not None:
+            node = self.NodeList[goal_indices]
             path.append([node.x, node.y])
-            goalind = node.parent
+            goal_indices = node.parent
         path.append([self.start.x, self.start.y])
         return path
 
@@ -438,8 +433,8 @@ class RRT_FND(__Q_table):
 
         distanceList = np.subtract( np.array([ (node.x, node.y) for node in self.NodeList.values() ]), (new_node.x,new_node.y))**2
         distanceList = np.sum(distanceList, axis=1)
-        nearinds = np.where(dlist <= r ** 2)
-        nearinds = np.array(list(self.NodeList.keys()))[nearinds]
+        near_indices = np.where(distanceList <= r ** 2)
+        near_indices = np.array(list(self.NodeList.keys()))[near_indices]
 
         return nearinds
 
@@ -469,21 +464,19 @@ class RRT_FND(__Q_table):
         for i in range(int(d/5)):
             tmpNode.x += 5 * math.cos(theta)
             tmpNode.y += 5 * math.sin(theta)
-            if not self.__CollisionCheck(tmpNode, self.obstacleList):
+            if not self.CollisionCheck(tmpNode, self.obstacleList):
                 return False
 
         return True
 
     def DrawGraph(self, rnd=None):
-        u"""
-        Draw Graph
-        """
-        screen.fill((255, 255, 255))
-        for node in self.nodeList.values():
-            if node.parent is not None:
-                pygame.draw.line(screen,(0,255,0),[self.nodeList[node.parent].x,self.nodeList[node.parent].y],[node.x,node.y])
 
-        for node in self.nodeList.values():
+        screen.fill((255, 255, 255))
+        for node in self.NodeList.values():
+            if node.parent is not None:
+                pygame.draw.line(screen,(0,255,0),[self.NodeList[node.parent].x,self.NodeList[node.parent].y],[node.x,node.y])
+
+        for node in self.NodeList.values():
             if len(node.children) == 0: 
                 pygame.draw.circle(screen, (255,0,255), [int(node.x),int(node.y)], 2)
                 
@@ -522,13 +515,10 @@ class RRT_FND(__Q_table):
         return True  
     
     
-    def main():
-        print("start RRT path planning")
+def main():
+    print("start RRT path planning")
 
-    # ====Search Path with RRT====
-    
-    
-    
+
     obstacleList = [
         (400, 380, 400, 20),
         (400, 220, 20, 180),
@@ -537,21 +527,17 @@ class RRT_FND(__Q_table):
         (500, 450, 20, 150),
         (400, 100, 20, 80),
         (100, 100, 100, 20)
-    ]  # [x,y,size]
-    # Set Initial parameters
-    rrt = RRT_FND(start=[20, 580], goal=[540, 150],
-              randArea=[XDIM, YDIM], obstacleList=obstacleList)
-    path = rrt.Planning(animation=show_animation)
+    ]  
+
+    rrt = RRT(obstacleList = obstacleList, start =[10, 580], goal = [540, 150],
+              randArea = [XDIM, YDIM])
+    
+    path = rrt.planning(animation=show_animation)
 
 
-    if __name__ == '__main__':
-        main()  
-
-
-# In[ ]:
-
-
-
+if __name__ == '__main__':
+    main()  
+    
 
 
 # In[ ]:
